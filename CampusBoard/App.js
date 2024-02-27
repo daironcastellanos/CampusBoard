@@ -1,7 +1,11 @@
 import React from 'react';
-import LoginScreen from './screens/LoginScreen';
-import SignupScreen from './screens/SignupScreen';
+import { View } from 'react-native'; 
+import BottomTabBar from './components/BottomTabBar';
 
 export default function App() {
-  return <SignupScreen />;
+  return (
+    <View style={{flex: 1, justifyContent: 'flex-end'}}>
+      <BottomTabBar />
+    </View>
+  );
 }
