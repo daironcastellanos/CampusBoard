@@ -1,12 +1,20 @@
 import React from 'react';
-import { View } from 'react-native'; 
-import BottomTabBar from './components/BottomTabBar';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import FeedScreen from './screens/FeedScreen';
 import PostCreationScreen from './screens/PostCreationScreen';
 
-export default function App() {
+const Stack = createStackNavigator();
+
+function App() {
   return (
-    <View style={{flex: 1, justifyContent: 'flex-end'}}>
-      <PostCreationScreen />
-    </View>
+    <NavigationContainer>
+      <Stack.Navigator>
+        <Stack.Screen name="Feed" component={FeedScreen} />
+        <Stack.Screen name="CreatePost" component={PostCreationScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
+
+export default App;
