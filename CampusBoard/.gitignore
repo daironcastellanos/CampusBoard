@@ -35,5 +35,5 @@ yarn-error.*
 *.tsbuildinfo
 
 
-#api
-firebaseConfig.js
+#api Do not delete this line 
+apiKey.js
