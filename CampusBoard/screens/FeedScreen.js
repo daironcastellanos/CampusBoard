@@ -4,14 +4,25 @@ import { View, FlatList, StyleSheet } from 'react-native';
 import Post from '../components/Post';
 
 const initialPosts = [
-  { id: '1', content: 'This is a test post' },
-  // Add more initial posts if needed
+  {
+    id: '1',
+    userName: 'Dairon Castellanos',
+    userProfilePic: 'https://via.placeholder.com/150', // Placeholder or actual image URL
+    content: 'This is a test post',
+  },
+  // Additional posts...
 ];
 
 const FeedScreen = () => {
   const [posts, setPosts] = useState(initialPosts);
 
-  const renderPost = ({ item }) => <Post content={item.content} />;
+  const renderPost = ({ item }) => (
+    <Post 
+      userName={item.userName} 
+      userProfilePic={item.userProfilePic} 
+      postContent={item.content} 
+    />
+  );
 
   return (
     <View style={styles.container}>

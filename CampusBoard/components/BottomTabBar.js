@@ -1,31 +1,59 @@
 // BottomTabBar.js
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons'; // Make sure to install expo icons package
+import { Ionicons } from '@expo/vector-icons';
 
-const BottomTabBar = () => {
+const BottomTabBar = ({ state, descriptors, navigation }) => {
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.tabItem}>
-        <Ionicons name="home" size={24} color="black" />
-        <Text>Home</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.tabItem}>
-        <Ionicons name="search" size={24} color="black" />
-        <Text>Discover</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.tabItem}>
-        <Ionicons name="add-circle-outline" size={24} color="black" />
-        <Text>Post</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.tabItem}>
-        <Ionicons name="bookmark" size={24} color="black" />
-        <Text>Bookmarked</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.tabItem}>
-        <Ionicons name="person" size={24} color="black" />
-        <Text>Profile</Text>
-      </TouchableOpacity>
+      {state.routes.map((route, index) => {
+        const { options } = descriptors[route.key];
+        const label =
+          options.tabBarLabel !== undefined
+            ? options.tabBarLabel
+            : options.title !== undefined
+            ? options.title
+            : route.name;
+
+        const isFocused = state.index === index;
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
+
+        // Define the icon based on the route name
+        let iconName;
+        if (route.name === 'Home') {
+          iconName = 'home';
+        } else if (route.name === 'Discover') {
+          iconName = 'search';
+        } else if (route.name === 'Post') {
+          iconName = 'add-circle-outline';
+        } else if (route.name === 'Bookmarked') {
+          iconName = 'bookmark';
+        } else if (route.name === 'Profile') {
+          iconName = 'person';
+        }
+
+        return (
+          <TouchableOpacity
+            key={route.key}
+            onPress={onPress}
+            style={styles.tabItem}
+          >
+            <Ionicons name={iconName} size={24} color={isFocused ? 'blue' : 'black'} />
+            <Text style={{ color: isFocused ? 'blue' : 'black' }}>{label}</Text>
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 };
