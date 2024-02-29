@@ -1,16 +1,31 @@
-// screens/ProfileScreen.js
+//ProfileScreen.js
 import React from 'react';
-import { View, Text, Image, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native'; // Import useNavigation hook to navigate after sign out
+import { auth } from '../firebaseConfig'; // Adjust the import path as necessary
+import { signOut } from 'firebase/auth';
 
 const ProfileScreen = () => {
-  // Sample data for the profile
+  const navigation = useNavigation();
+
+  // Function to handle sign-out
+  const handleSignOut = () => {
+    signOut(auth).then(() => {
+      // Sign-out successful.
+      console.log('User signed out');
+      navigation.replace('Login'); // Assuming you have a 'Login' screen in your navigation stack
+    }).catch((error) => {
+      // An error happened.
+      //console.error('Sign out error:', error);
+    });
+  };
+
   const userProfile = {
     name: 'John Doe',
-    profilePicUrl: 'https://via.placeholder.com/150', // Placeholder image
+    profilePicUrl: 'https://via.placeholder.com/150',
     posts: [
       { id: '1', content: 'This is my first post!' },
       { id: '2', content: 'Here is another interesting post.' },
-      // Add more sample posts as needed
     ],
   };
 
@@ -20,13 +35,14 @@ const ProfileScreen = () => {
         <Image source={{ uri: userProfile.profilePicUrl }} style={styles.profilePic} />
         <Text style={styles.userName}>{userProfile.name}</Text>
       </View>
-      <View style={styles.postsContainer}>
-        {userProfile.posts.map((post) => (
-          <View key={post.id} style={styles.post}>
-            <Text>{post.content}</Text>
-          </View>
-        ))}
-      </View>
+      {userProfile.posts.map((post) => (
+        <View key={post.id} style={styles.post}>
+          <Text>{post.content}</Text>
+        </View>
+      ))}
+      <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
+        <Text style={styles.logoutButtonText}>Log Out</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -57,6 +73,18 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 5,
     marginBottom: 10,
+  },
+  logoutButton: {
+    marginTop: 20,
+    backgroundColor: 'blue',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginHorizontal: 20,
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontSize: 18,
   },
 });
 

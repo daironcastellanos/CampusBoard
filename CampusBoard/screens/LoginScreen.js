@@ -1,5 +1,7 @@
 import React from 'react';
-import { View, TextInput, Button, Text, StyleSheet } from 'react-native';
+import { View, TextInput, Button, Text, StyleSheet, Alert } from 'react-native';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
+
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 
@@ -10,12 +12,33 @@ const LoginSchema = Yup.object().shape({
 });
 
 const LoginScreen = () => {
+  const auth = getAuth(); // Ensure you have initialized Firebase Auth correctly
+
+  // Function to handle user login
+  const handleLogin = (email, password) => {
+    signInWithEmailAndPassword(auth, email, password)
+      .then((userCredential) => {
+        // Signed in 
+        const user = userCredential.user;
+        console.log("Login Successful", user);
+        // You can navigate or do other actions here after successful login
+      })
+      .catch((error) => {
+        const errorCode = error.code;
+        const errorMessage = error.message;
+        Alert.alert("Login Failed", errorMessage);
+      });
+  };
+
   return (
     <View style={styles.container}>
       <Formik
         initialValues={{ email: '', password: '' }}
         validationSchema={LoginSchema}
-        onSubmit={values => console.log(values)}
+        onSubmit={(values) => {
+          // Call the login function with email and password
+          handleLogin(values.email, values.password);
+        }}
       >
         {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
           <View>
