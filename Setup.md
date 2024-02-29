@@ -50,3 +50,8 @@ Platform-Specific Dependencies: Some dependencies may need extra setup for iOS o
 Troubleshooting
 If you encounter any issues with dependencies, try removing the node_modules directory and the package-lock.json file, then run npm install again.
 For issues related to Expo, consult the Expo documentation.
+
+To start your project and connect a laptop(Windows) to an iphone(ios):
+recommended to use the command:
+`npx expo start --tunnel`
+to connect via tunnel using the QR code provided.
