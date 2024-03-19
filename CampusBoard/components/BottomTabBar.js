@@ -33,12 +33,11 @@ const BottomTabBar = ({ state, descriptors, navigation }) => {
         let iconName;
         if (route.name === 'Home') {
           iconName = 'home';
-        } else if (route.name === 'Discover') {
-          iconName = 'search';
+        } else if (route.name === 'Search') {
+          iconName = 'ios-search';
         } else if (route.name === 'Post') {
           iconName = 'add-circle-outline';
-        } else if (route.name === 'Bookmarked') {
-          iconName = 'bookmark';
+        
         } else if (route.name === 'Profile') {
           iconName = 'person';
         }

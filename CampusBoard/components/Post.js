@@ -2,7 +2,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 
-const Post = ({ userName, userProfilePic, postContent }) => {
+const Post = ({ userName, userProfilePic, postContent, imageUrl }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -10,10 +10,17 @@ const Post = ({ userName, userProfilePic, postContent }) => {
         <Text style={styles.userName}>{userName}</Text>
       </View>
       <Text style={styles.content}>{postContent}</Text>
+      {imageUrl && <Image source={{ uri: imageUrl }} style={styles.postImage} />}
     </View>
   );
 };
 
+
+
+
+
+
+// No changes in styles
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#fff',
@@ -43,6 +50,13 @@ const styles = StyleSheet.create({
   content: {
     marginTop: 5,
   },
+  // Add styles for the postImage
+  postImage: {
+    width: '100%',
+    height: 200, // Adjust as needed
+    marginTop: 10,
+    borderRadius: 5,
+  }
 });
 
 export default Post;

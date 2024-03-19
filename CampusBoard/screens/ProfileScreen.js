@@ -1,33 +1,72 @@
-//ProfileScreen.js
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { useNavigation } from '@react-navigation/native'; // Import useNavigation hook to navigate after sign out
-import { auth } from '../firebaseConfig'; // Adjust the import path as necessary
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { auth, db } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
 const ProfileScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute();
+  const [userProfile, setUserProfile] = useState(null);
+
+  // Determine which user's profile to show: current user or another user
+  const userId = route.params?.userId || auth.currentUser?.uid;
+  const isCurrentUserProfile = userId === auth.currentUser?.uid;
+
+  useEffect(() => {
+    const getUserProfile = async () => {
+      try {
+        const userDoc = doc(db, 'users', userId);
+        const docSnap = await getDoc(userDoc);
+
+        if (docSnap.exists()) {
+          const userData = docSnap.data();
+          setUserProfile({
+            name: userData.name,
+            profilePicUrl: userData.profileImageUrl || 'https://via.placeholder.com/150',
+            // Here, you would also fetch the posts if they are stored in Firestore
+            posts: [],
+          });
+        } else {
+          console.log('No such document!');
+        }
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+      }
+    };
+
+    if (userId) {
+      getUserProfile();
+    }
+  }, [userId]);
 
   // Function to handle sign-out
-  const handleSignOut = () => {
-    signOut(auth).then(() => {
-      // Sign-out successful.
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
       console.log('User signed out');
-      navigation.replace('Login'); // Assuming you have a 'Login' screen in your navigation stack
-    }).catch((error) => {
-      // An error happened.
-      //console.error('Sign out error:', error);
-    });
+      navigation.replace('Login');
+    } catch (error) {
+      console.error('Sign out error:', error);
+    }
   };
 
-  const userProfile = {
-    name: 'John Doe',
-    profilePicUrl: 'https://via.placeholder.com/150',
-    posts: [
-      { id: '1', content: 'This is my first post!' },
-      { id: '2', content: 'Here is another interesting post.' },
-    ],
+  // Function to handle follow action
+  const handleFollow = () => {
+    // Implement the logic to follow the user
+    console.log(`Following ${userProfile.name}`);
+    // Update state to reflect follow status (not shown here)
   };
+
+  // If userProfile is null, you may want to return a loading indicator instead
+  if (!userProfile) {
+    return (
+      <View style={styles.centered}>
+        <Text>Loading profile...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -35,14 +74,22 @@ const ProfileScreen = () => {
         <Image source={{ uri: userProfile.profilePicUrl }} style={styles.profilePic} />
         <Text style={styles.userName}>{userProfile.name}</Text>
       </View>
-      {userProfile.posts.map((post) => (
-        <View key={post.id} style={styles.post}>
-          <Text>{post.content}</Text>
-        </View>
-      ))}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
-        <Text style={styles.logoutButtonText}>Log Out</Text>
-      </TouchableOpacity>
+
+      {/* Render user posts here */}
+      
+      {/* Only show the follow button if it's not the current user's profile */}
+      {!isCurrentUserProfile && (
+        <TouchableOpacity style={styles.followButton} onPress={handleFollow}>
+          <Text style={styles.followButtonText}>AllyGator</Text>
+        </TouchableOpacity>
+      )}
+      
+      {/* Show the logout button only if it's the current user's profile */}
+      {isCurrentUserProfile && (
+        <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
+          <Text style={styles.logoutButtonText}>Log Out</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 };
@@ -65,14 +112,17 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 10,
   },
-  postsContainer: {
-    paddingHorizontal: 20,
-  },
-  post: {
-    backgroundColor: '#f0f0f0',
-    padding: 15,
+  followButton: {
+    backgroundColor: 'green', // Use a color that suits your app's theme
+    padding: 10,
     borderRadius: 5,
-    marginBottom: 10,
+    alignItems: 'center',
+    marginTop: 10,
+    marginHorizontal: 20,
+  },
+  followButtonText: {
+    color: 'white',
+    fontSize: 18,
   },
   logoutButton: {
     marginTop: 20,
@@ -86,6 +136,7 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
   },
+  // Add any other styles you need here
 });
 
 export default ProfileScreen;

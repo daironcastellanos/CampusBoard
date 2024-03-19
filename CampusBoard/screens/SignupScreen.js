@@ -3,8 +3,15 @@ import { View, TextInput, Button, Text, StyleSheet, Image, Alert } from 'react-n
 import { Formik } from 'formik';
 import * as Yup from 'yup';
 import { useNavigation } from '@react-navigation/native';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth'; // Import Firebase auth functions
-import * as ImagePicker from 'expo-image-picker'; // Import ImagePicker
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getFirestore, doc, setDoc } from 'firebase/firestore';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import * as ImagePicker from 'expo-image-picker';
+// Firebase configuration and initialization 
+import { auth, db, storage } from '../firebaseConfig';
+import { firebaseConfig } from '../firebaseConfig';  // Update the path as necessary
+
+
 
 // Validation schema for the signup form
 const SignupSchema = Yup.object().shape({
@@ -18,44 +25,48 @@ const SignupSchema = Yup.object().shape({
 
 const SignupScreen = () => {
   const navigation = useNavigation();
-  const auth = getAuth();
-  const [image, setImage] = useState(null); // State for storing selected image
+  const [image, setImage] = useState(null);
 
-  // Function to handle image selection, moved inside the component
   const pickImage = async () => {
-    // Request permission to access the media library
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
     if (permissionResult.granted === false) {
       alert("You've refused to allow this app to access your photos!");
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 1,
     });
-
-    if (!result.cancelled) {
+    if (!result.canceled) {
       setImage(result.uri);
     }
   };
 
-  // Function to handle user signup
-  const handleSignUp = (email, password) => {
-    createUserWithEmailAndPassword(auth, email, password)
-      .then((userCredential) => {
-        // User is successfully signed up and logged in
-        console.log("User signed up: ", userCredential.user);
-        // TODO: Here you might want to upload the image to Firebase Storage and link it to the user's profile
-        navigation.navigate('Login'); // Navigate to the Login screen after successful signup
-      })
-      .catch((error) => {
-        console.error("Signup error: ", error.message);
-        Alert.alert("Signup error", error.message);
+  const handleSignUp = async ({ name, email, password }) => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      let imageUrl = '';
+      if (image) {
+        const blob = await (await fetch(image)).blob();
+        const imageRef = ref(storage, `profileImages/${user.uid}`);
+        const snapshot = await uploadBytes(imageRef, blob);
+        imageUrl = await getDownloadURL(snapshot.ref);
+      }
+
+      await setDoc(doc(db, 'users', user.uid), {
+        name,
+        email,
+        profileImageUrl: imageUrl
       });
+
+      navigation.navigate('Login');
+    } catch (error) {
+      Alert.alert("Signup error", error.message);
+    }
   };
 
   return (
@@ -63,10 +74,11 @@ const SignupScreen = () => {
       <Formik
         initialValues={{ name: '', email: '', password: '', confirmPassword: '' }}
         validationSchema={SignupSchema}
-        onSubmit={({ email, password }) => handleSignUp(email, password)}
+        onSubmit={values => handleSignUp(values)}
       >
         {({ handleChange, handleBlur, handleSubmit, values, errors, touched }) => (
           <View>
+            {/* Name Input */}
             <TextInput
               onChangeText={handleChange('name')}
               onBlur={handleBlur('name')}
@@ -76,38 +88,46 @@ const SignupScreen = () => {
             />
             {touched.name && errors.name && <Text style={styles.error}>{errors.name}</Text>}
 
+            {/* Email Input */}
             <TextInput
               onChangeText={handleChange('email')}
               onBlur={handleBlur('email')}
               value={values.email}
               placeholder="Email"
               style={styles.input}
+              keyboardType="email-address"
             />
             {touched.email && errors.email && <Text style={styles.error}>{errors.email}</Text>}
 
+            {/* Password Input */}
             <TextInput
               onChangeText={handleChange('password')}
               onBlur={handleBlur('password')}
               value={values.password}
               placeholder="Password"
-              secureTextEntry={true}
               style={styles.input}
+              secureTextEntry
             />
             {touched.password && errors.password && <Text style={styles.error}>{errors.password}</Text>}
 
+            {/* Confirm Password Input */}
             <TextInput
               onChangeText={handleChange('confirmPassword')}
               onBlur={handleBlur('confirmPassword')}
               value={values.confirmPassword}
               placeholder="Confirm Password"
-              secureTextEntry={true}
               style={styles.input}
+              secureTextEntry
             />
             {touched.confirmPassword && errors.confirmPassword && <Text style={styles.error}>{errors.confirmPassword}</Text>}
 
+            {/* Image Picker Button */}
             <Button title="Pick an Image" onPress={pickImage} />
+
+            {/* Picked Image Preview */}
             {image && <Image source={{ uri: image }} style={styles.image} />}
-            
+
+            {/* Sign Up Button */}
             <Button onPress={handleSubmit} title="Sign Up" />
           </View>
         )}
@@ -120,8 +140,10 @@ const SignupScreen = () => {
   );
 };
 
-// Styles for the signup screen, including styles for the image
+// Styles for the signup screen
 const styles = StyleSheet.create({
+  // ... styles remain unchanged ...
+
   container: {
     flex: 1,
     justifyContent: 'center',

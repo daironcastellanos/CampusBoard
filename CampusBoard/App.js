@@ -9,6 +9,7 @@ import { auth } from './firebaseConfig'; // Ensure this path is correct
 import FeedScreen from './screens/FeedScreen';
 import PostCreationScreen from './screens/PostCreationScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import SearchScreen from './screens/SearchScreen';
 import SignupScreen from './screens/SignupScreen';
 import LoginScreen from './screens/LoginScreen';
 import BottomTabBar from './components/BottomTabBar';
@@ -36,6 +37,7 @@ function App() {
   const MainApp = () => (
     <Tab.Navigator tabBar={props => <BottomTabBar {...props} />}>
       <Tab.Screen name="Home" component={FeedScreen} />
+      <Tab.Screen name="Search" component={SearchScreen} />
       <Tab.Screen name="Post" component={PostCreationScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
