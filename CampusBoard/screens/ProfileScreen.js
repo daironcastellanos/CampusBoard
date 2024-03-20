@@ -1,9 +1,10 @@
+//ProfileScreen.js 
 import React, { useEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { auth, db } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, arrayUnion } from 'firebase/firestore';
 
 const ProfileScreen = () => {
   const navigation = useNavigation();
@@ -14,25 +15,29 @@ const ProfileScreen = () => {
   const userId = route.params?.userId || auth.currentUser?.uid;
   const isCurrentUserProfile = userId === auth.currentUser?.uid;
 
+  console.log('ProfileScreen: userId is', userId); // Debugging log
+
   useEffect(() => {
     const getUserProfile = async () => {
+      console.log('Getting user profile for userId:', userId); // Debugging log
       try {
         const userDoc = doc(db, 'users', userId);
         const docSnap = await getDoc(userDoc);
 
         if (docSnap.exists()) {
           const userData = docSnap.data();
+          console.log('User data found:', userData); // Debugging log
           setUserProfile({
+            id: userId,
             name: userData.name,
             profilePicUrl: userData.profileImageUrl || 'https://via.placeholder.com/150',
-            // Here, you would also fetch the posts if they are stored in Firestore
-            posts: [],
+            posts: [], // Assuming posts will be populated later
           });
         } else {
-          console.log('No such document!');
+          console.log('No such document exists!'); // Debugging log
         }
       } catch (error) {
-        console.error("Error fetching user profile:", error);
+        console.error("Error fetching user profile:", error); // Debugging log
       }
     };
 
@@ -45,21 +50,29 @@ const ProfileScreen = () => {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      console.log('User signed out');
       navigation.replace('Login');
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('Error signing out:', error); // Debugging log
     }
   };
 
   // Function to handle follow action
-  const handleFollow = () => {
-    // Implement the logic to follow the user
-    console.log(`Following ${userProfile.name}`);
-    // Update state to reflect follow status (not shown here)
+  const handleFollow = async (userIdToFollow) => {
+    const currentUserId = auth.currentUser.uid;
+    console.log('Current user:', currentUserId, 'following:', userIdToFollow); // Debugging log
+    const followsDocRef = doc(db, 'follows', currentUserId);
+
+    try {
+      await setDoc(followsDocRef, {
+        following: arrayUnion(userIdToFollow)
+      }, { merge: true });
+      console.log(`Now following user with ID: ${userIdToFollow}`); // Debugging log
+    } catch (error) {
+      console.error("Error following user:", error); // Debugging log
+    }
   };
 
-  // If userProfile is null, you may want to return a loading indicator instead
+  // If userProfile is null, show a loading indicator
   if (!userProfile) {
     return (
       <View style={styles.centered}>
@@ -68,6 +81,7 @@ const ProfileScreen = () => {
     );
   }
 
+  // Main render
   return (
     <ScrollView style={styles.container}>
       <View style={styles.profileInfo}>
@@ -76,15 +90,16 @@ const ProfileScreen = () => {
       </View>
 
       {/* Render user posts here */}
-      
-      {/* Only show the follow button if it's not the current user's profile */}
-      {!isCurrentUserProfile && (
-        <TouchableOpacity style={styles.followButton} onPress={handleFollow}>
-          <Text style={styles.followButtonText}>AllyGator</Text>
+
+      {!isCurrentUserProfile && userProfile && (
+        <TouchableOpacity 
+          style={styles.followButton} 
+          onPress={() => handleFollow(userProfile.id)}
+        >
+          <Text style={styles.followButtonText}>Follow</Text>
         </TouchableOpacity>
       )}
-      
-      {/* Show the logout button only if it's the current user's profile */}
+
       {isCurrentUserProfile && (
         <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
           <Text style={styles.logoutButtonText}>Log Out</Text>
