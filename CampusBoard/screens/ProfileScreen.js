@@ -4,84 +4,81 @@ import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity } from 'rea
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { auth, db } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc, setDoc, arrayUnion } from 'firebase/firestore';
+import { doc, getDoc,updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 
 const ProfileScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const [userProfile, setUserProfile] = useState(null);
-
-  // Determine which user's profile to show: current user or another user
+  const [isFollowing, setIsFollowing] = useState(false);
   const userId = route.params?.userId || auth.currentUser?.uid;
   const isCurrentUserProfile = userId === auth.currentUser?.uid;
 
   console.log('ProfileScreen: userId is', userId); // Debugging log
 
   useEffect(() => {
-    const getUserProfile = async () => {
-      console.log('Getting user profile for userId:', userId); // Debugging log
-      try {
-        const userDoc = doc(db, 'users', userId);
-        const docSnap = await getDoc(userDoc);
+    const getUserProfileAndFollowStatus = async () => {
+      const userDocRef = doc(db, 'users', userId);
+      const followsDocRef = doc(db, 'follows', auth.currentUser.uid);
 
-        if (docSnap.exists()) {
-          const userData = docSnap.data();
-          console.log('User data found:', userData); // Debugging log
+      try {
+        const userDocSnap = await getDoc(userDocRef);
+        const followsDocSnap = await getDoc(followsDocRef);
+
+        if (userDocSnap.exists()) {
           setUserProfile({
             id: userId,
-            name: userData.name,
-            profilePicUrl: userData.profileImageUrl || 'https://via.placeholder.com/150',
-            posts: [], // Assuming posts will be populated later
+            name: userDocSnap.data().name,
+            profilePicUrl: userDocSnap.data().profileImageUrl || 'https://via.placeholder.com/150',
           });
-        } else {
-          console.log('No such document exists!'); // Debugging log
+        }
+
+        if (followsDocSnap.exists()) {
+          const following = followsDocSnap.data().following || [];
+          setIsFollowing(following.includes(userId));
         }
       } catch (error) {
-        console.error("Error fetching user profile:", error); // Debugging log
+        console.error("Error fetching user data:", error);
       }
     };
 
-    if (userId) {
-      getUserProfile();
-    }
+    getUserProfileAndFollowStatus();
   }, [userId]);
 
-  // Function to handle sign-out
+  const handleFollowToggle = async () => {
+    const followsDocRef = doc(db, 'follows', auth.currentUser.uid);
+    try {
+      if (isFollowing) {
+        // Unfollow the user
+        await updateDoc(followsDocRef, {
+          following: arrayRemove(userId)
+        });
+        setIsFollowing(false);
+      } else {
+        // Follow the user
+        await updateDoc(followsDocRef, {
+          following: arrayUnion(userId)
+        });
+        setIsFollowing(true);
+      }
+    } catch (error) {
+      console.error("Error updating follow status:", error);
+    }
+  };
+
   const handleSignOut = async () => {
     try {
       await signOut(auth);
       navigation.replace('Login');
     } catch (error) {
-      console.error('Error signing out:', error); // Debugging log
+      console.error('Error signing out:', error);
     }
   };
 
-  // Function to handle follow action
-  const handleFollow = async (userIdToFollow) => {
-    const currentUserId = auth.currentUser.uid;
-    console.log('Current user:', currentUserId, 'following:', userIdToFollow); // Debugging log
-    const followsDocRef = doc(db, 'follows', currentUserId);
-
-    try {
-      await setDoc(followsDocRef, {
-        following: arrayUnion(userIdToFollow)
-      }, { merge: true });
-      console.log(`Now following user with ID: ${userIdToFollow}`); // Debugging log
-    } catch (error) {
-      console.error("Error following user:", error); // Debugging log
-    }
-  };
-
-  // If userProfile is null, show a loading indicator
   if (!userProfile) {
-    return (
-      <View style={styles.centered}>
-        <Text>Loading profile...</Text>
-      </View>
-    );
+    return <View style={styles.centered}><Text>Loading profile...</Text></View>;
   }
 
-  // Main render
   return (
     <ScrollView style={styles.container}>
       <View style={styles.profileInfo}>
@@ -89,19 +86,19 @@ const ProfileScreen = () => {
         <Text style={styles.userName}>{userProfile.name}</Text>
       </View>
 
-      {/* Render user posts here */}
-
-      {!isCurrentUserProfile && userProfile && (
+      {/* Conditional rendering for Follow/Unfollow button */}
+      {!isCurrentUserProfile ? (
         <TouchableOpacity 
           style={styles.followButton} 
-          onPress={() => handleFollow(userProfile.id)}
-        >
-          <Text style={styles.followButtonText}>Follow</Text>
+          onPress={handleFollowToggle}>
+          <Text style={styles.followButtonText}>
+            {isFollowing ? 'Unfollow' : 'Follow'}
+          </Text>
         </TouchableOpacity>
-      )}
-
-      {isCurrentUserProfile && (
-        <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
+      ) : (
+        <TouchableOpacity 
+          style={styles.logoutButton} 
+          onPress={handleSignOut}>
           <Text style={styles.logoutButtonText}>Log Out</Text>
         </TouchableOpacity>
       )}
@@ -150,6 +147,11 @@ const styles = StyleSheet.create({
   logoutButtonText: {
     color: 'white',
     fontSize: 18,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
   },
   // Add any other styles you need here
 });
