@@ -1,74 +1,64 @@
 import React, { useEffect, useState } from 'react';
 import { View, FlatList, StyleSheet, Text, Image } from 'react-native';
 import Post from '../components/Post';
-import { getFirestore, collection, getDocs, doc, getDoc } from 'firebase/firestore';
-import { auth } from '../firebaseConfig'; // Make sure you import auth correctly
+import { Picker } from '@react-native-picker/picker'; // Ensure this import is correct
+import { getFirestore, collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
+import { auth } from '../firebaseConfig';
 
 const FeedScreen = () => {
   const [posts, setPosts] = useState([]);
+  const [selectedTag, setSelectedTag] = useState('all'); // Default selection
+  const predefinedTags = ['all', 'safety', 'homework', 'party', 'sublease']; // Example tags
 
   useEffect(() => {
     const fetchFollowingPosts = async () => {
       const db = getFirestore();
       const currentUser = auth.currentUser;
-
+  
       if (!currentUser) {
         console.log("No user logged in");
         return;
       }
-
-      // Fetch the following list for the current user
+  
       const followsDocRef = doc(db, 'follows', currentUser.uid);
       const followsDocSnap = await getDoc(followsDocRef);
-
+  
       if (!followsDocSnap.exists()) {
         console.log("Following list not found");
         return;
       }
-
+  
       const followingList = followsDocSnap.data().following || [];
-      const postsList = [];
-
-      // Fetch posts for each following user
-for (const userId of followingList) {
-  const userPostsRef = collection(db, 'posts');
-  const userPostsSnapshot = await getDocs(userPostsRef);
-  userPostsSnapshot.forEach((doc) => {
-    if (doc.data().userId === userId) {
-      postsList.push({
-        id: doc.id,
-        ...doc.data(),
-      });
-    }
-  });
-}
-
-// Sort posts by createdAt timestamp, assuming it's stored as a Firestore Timestamp
-// Convert Firestore Timestamp to JavaScript Date if necessary
-postsList.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
-
-      // Fetch user details for each post in parallel
-      const postsWithUserDetails = await Promise.all(postsList.map(async (post) => {
-        const userRef = doc(db, 'users', post.userId);
-        const userSnapshot = await getDoc(userRef);
-
-        if (userSnapshot.exists()) {
-          const userData = userSnapshot.data();
-          return {
-            ...post,
-            userName: userData.name || 'Anonymous',
-            userProfilePic: userData.profileImageUrl || 'default-profile-pic-url',
-          };
+      let postsList = [];
+  
+      // Fetch posts
+      for (const userId of followingList) {
+        const postsQuery = query(collection(db, 'posts'), where("userId", "==", userId));
+        const querySnapshot = await getDocs(postsQuery);
+        const userDocRef = doc(db, "users", userId); // Reference to the user document
+        const userDocSnap = await getDoc(userDocRef);
+  
+        if (!userDocSnap.exists()) {
+          console.log("User not found");
+          continue; // Skip this iteration if the user details are not found
         }
-
-        return post;
-      }));
-
-      setPosts(postsWithUserDetails);
+        
+        const userData = userDocSnap.data(); // Extract user details
+  
+        querySnapshot.forEach((doc) => {
+          let post = { id: doc.id, ...doc.data(), userName: userData.name, userProfilePic: userData.profileImageUrl };
+          if (selectedTag === 'all' || post.tag === selectedTag) {
+            postsList.push(post);
+          }
+        });
+      }
+  
+      postsList.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+      setPosts(postsList);
     };
-
+  
     fetchFollowingPosts();
-  }, []);
+  }, [selectedTag]);
 
   const renderPost = ({ item }) => (
     <Post
@@ -76,11 +66,20 @@ postsList.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
       userProfilePic={item.userProfilePic}
       postContent={item.content}
       imageUrl={item.imageUrl}
+      createdAt={item.createdAt}
     />
   );
 
   return (
     <View style={styles.container}>
+      <Picker
+        selectedValue={selectedTag}
+        onValueChange={(itemValue, itemIndex) => setSelectedTag(itemValue)}
+        style={styles.picker}>
+        {predefinedTags.map((tag) => (
+          <Picker.Item key={tag} label={tag} value={tag} />
+        ))}
+      </Picker>
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id.toString()}
@@ -95,17 +94,10 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 10,
   },
-  post: {
-    marginVertical: 8,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  }
+  picker: {
+    width: '100%',
+    marginBottom: 20,
+  },
 });
 
 export default FeedScreen;

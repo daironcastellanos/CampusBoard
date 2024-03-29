@@ -2,7 +2,14 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 
-const Post = ({ userName, userProfilePic, postContent, imageUrl }) => {
+
+
+const Post = ({ userName, userProfilePic, postContent, imageUrl, createdAt }) => {
+  // Format the date/time for display
+  const displayDate = new Date(createdAt.seconds * 1000).toLocaleDateString("en-US", {
+    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -11,6 +18,8 @@ const Post = ({ userName, userProfilePic, postContent, imageUrl }) => {
       </View>
       <Text style={styles.content}>{postContent}</Text>
       {imageUrl && <Image source={{ uri: imageUrl }} style={styles.postImage} />}
+      {/* Display the formatted creation date/time */}
+      <Text style={styles.creationDate}>{displayDate}</Text>
     </View>
   );
 };
@@ -22,6 +31,11 @@ const Post = ({ userName, userProfilePic, postContent, imageUrl }) => {
 
 // No changes in styles
 const styles = StyleSheet.create({
+  creationDate: {
+    color: '#666',
+    fontSize: 12,
+    marginTop: 5,
+  },
   container: {
     backgroundColor: '#fff',
     padding: 10,
@@ -56,7 +70,8 @@ const styles = StyleSheet.create({
     height: 200, // Adjust as needed
     marginTop: 10,
     borderRadius: 5,
-  }
+  },
+  
 });
 
 export default Post;

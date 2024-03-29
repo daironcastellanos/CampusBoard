@@ -1,24 +1,32 @@
 import React, { useState } from 'react';
-import { View, TextInput, Button, StyleSheet, Alert, Image } from 'react-native';
+import { View, Button, StyleSheet, Alert, Image, Text, TextInput } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { db, auth, storage } from '../firebaseConfig'; // Ensure this path is correct
+import { db, auth, storage } from '../firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { Picker } from '@react-native-picker/picker';
 
 const PostCreationScreen = () => {
   const [postContent, setPostContent] = useState('');
+  const [selectedTag, setSelectedTag] = useState('safety');
   const [image, setImage] = useState(null);
+  const predefinedTags = ["safety", "homework", "party", "sublease"];
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-  
-    if (!result.cancelled) {
-      setImage(result.uri);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
+
+      if (!result.cancelled) {
+        setImage(result.uri);
+      }
+    } catch (error) {
+      console.error("Error picking image: ", error);
+      Alert.alert('Error', 'Could not pick the image. Please try again later.');
     }
   };
 
@@ -32,17 +40,18 @@ const PostCreationScreen = () => {
         const snapshot = await uploadBytes(imageRef, blob);
         imageUrl = await getDownloadURL(snapshot.ref);
       }
-  
-      // Use the same field name 'userId' as in Firestore
+
       await addDoc(collection(db, 'posts'), {
         content: postContent,
         imageUrl, // Store the image URL in the Firestore document
         userId: auth.currentUser.uid, // Consistent field name
-        createdAt: new Date()
+        createdAt: new Date(),
+        tag: selectedTag, // Store the selected tag
       });
-  
+
       Alert.alert('Success', 'Post created successfully!');
       setPostContent('');
+      setSelectedTag(predefinedTags[0]); // Reset the selected tag
       setImage(null);
     } catch (error) {
       console.error("Error uploading post: ", error);
@@ -52,7 +61,7 @@ const PostCreationScreen = () => {
 
   return (
     <View style={styles.container}>
-      {image && <Image source={{ uri: image }} style={{ width: 100, height: 100 }} />}
+      {image && <Image source={{ uri: image }} style={styles.image} />}
       <Button title="Pick an Image" onPress={pickImage} />
       <TextInput
         style={styles.input}
@@ -62,13 +71,20 @@ const PostCreationScreen = () => {
         onChangeText={setPostContent}
         value={postContent}
       />
+      <Text style={styles.label}>Select a Tag:</Text>
+      <Picker
+        selectedValue={selectedTag}
+        onValueChange={(itemValue) => setSelectedTag(itemValue)}
+        style={styles.picker}
+      >
+        {predefinedTags.map((tag) => (
+          <Picker.Item key={tag} label={tag} value={tag} />
+        ))}
+      </Picker>
       <Button title="Post" onPress={handlePostCreation} />
     </View>
   );
 };
-
-
-
 
 const styles = StyleSheet.create({
   container: {
@@ -84,6 +100,19 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 20,
     borderRadius: 5,
+  },
+  picker: {
+    width: '100%',
+    height: 50,
+  },
+  image: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+  },
+  label: {
+    alignSelf: 'flex-start',
+    marginBottom: 10,
   },
 });
 
