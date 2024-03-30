@@ -6,15 +6,20 @@ import { getFirestore, collection, getDocs, doc, getDoc, query, where } from 'fi
 import { auth } from '../firebaseConfig';
 
 const FeedScreen = () => {
-  const [posts, setPosts] = useState([]);
-  const [selectedTag, setSelectedTag] = useState('all'); // Default selection
+  // State variables
+  const [posts, setPosts] = useState([]);// Stores the list of posts
+  const [selectedTag, setSelectedTag] = useState('all'); // Stores the currently selected tag
+  
+  // Predefined tags for filtering posts
   const predefinedTags = ['all', 'safety', 'homework', 'party', 'sublease']; // Example tags
 
   useEffect(() => {
+    // Function to fetch posts from the Firestore database
     const fetchFollowingPosts = async () => {
       const db = getFirestore();
       const currentUser = auth.currentUser;
-  
+
+      // Check if a user is logged in
       if (!currentUser) {
         console.log("No user logged in");
         return;
