@@ -24,47 +24,62 @@ const FeedScreen = () => {
         console.log("No user logged in");
         return;
       }
-  
+
+      // Get the reference to the user's "follows" document
       const followsDocRef = doc(db, 'follows', currentUser.uid);
       const followsDocSnap = await getDoc(followsDocRef);
-  
+
+      // Check if the "follows" document exists
       if (!followsDocSnap.exists()) {
         console.log("Following list not found");
         return;
       }
-  
+
+       // Extract the list of followed user IDs
       const followingList = followsDocSnap.data().following || [];
       let postsList = [];
   
-      // Fetch posts
+      // Fetch posts for each followed user
       for (const userId of followingList) {
+        // Query posts collection for the current user ID
         const postsQuery = query(collection(db, 'posts'), where("userId", "==", userId));
         const querySnapshot = await getDocs(postsQuery);
-        const userDocRef = doc(db, "users", userId); // Reference to the user document
+
+        // Get the reference to the user's document
+        const userDocRef = doc(db, "users", userId); 
         const userDocSnap = await getDoc(userDocRef);
-  
+
+        // Check if the user document exists
         if (!userDocSnap.exists()) {
           console.log("User not found");
           continue; // Skip this iteration if the user details are not found
         }
-        
-        const userData = userDocSnap.data(); // Extract user details
-  
+
+        // Extract user details
+        const userData = userDocSnap.data(); 
+
+        // Iterate over each post document
         querySnapshot.forEach((doc) => {
+           // Create a post object with additional user details
           let post = { id: doc.id, ...doc.data(), userName: userData.name, userProfilePic: userData.profileImageUrl };
+          // Filter posts based on the selected tag
           if (selectedTag === 'all' || post.tag === selectedTag) {
             postsList.push(post);
           }
         });
       }
-  
+
+      // Sort posts by createdAt timestamp in descending order
       postsList.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
+      
+      // Update the state with the fetched posts
       setPosts(postsList);
     };
   
     fetchFollowingPosts();
-  }, [selectedTag]);
+  }, [selectedTag]);  // Re-fetch posts when the selected tag changes
 
+  // Render individual post component
   const renderPost = ({ item }) => (
     <Post
       userName={item.userName}
@@ -94,6 +109,7 @@ const FeedScreen = () => {
   );
 };
 
+// Styles for the component
 const styles = StyleSheet.create({
   container: {
     flex: 1,
