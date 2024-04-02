@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, FlatList, StyleSheet, Text, Image } from 'react-native';
 import Post from '../components/Post';
-import { Picker } from '@react-native-picker/picker'; // Ensure this import is correct
+import { Picker } from '@react-native-picker/picker';
 import { getFirestore, collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 import { auth } from '../firebaseConfig';
 
@@ -31,16 +31,16 @@ const FeedScreen = () => {
       const followingList = followsDocSnap.data().following || [];
       let postsList = [];
   
-      // Fetch posts
       for (const userId of followingList) {
         const postsQuery = query(collection(db, 'posts'), where("userId", "==", userId));
         const querySnapshot = await getDocs(postsQuery);
+        
         const userDocRef = doc(db, "users", userId); // Reference to the user document
         const userDocSnap = await getDoc(userDocRef);
   
         if (!userDocSnap.exists()) {
           console.log("User not found");
-          continue; // Skip this iteration if the user details are not found
+          continue;
         }
         
         const userData = userDocSnap.data(); // Extract user details
@@ -60,15 +60,21 @@ const FeedScreen = () => {
     fetchFollowingPosts();
   }, [selectedTag]);
 
-  const renderPost = ({ item }) => (
-    <Post
+  const renderPost = ({ item }) => {
+    console.log(item); // Check the structure of 'item'
+    return (
+      <Post
+      
       userName={item.userName}
       userProfilePic={item.userProfilePic}
-      postContent={item.content}
+      postContent={item.content} // Ensure this matches your data structure
       imageUrl={item.imageUrl}
       createdAt={item.createdAt}
-    />
-  );
+      tag={item.tag}
+    
+      />
+    );
+  };
 
   return (
     <View style={styles.container}>

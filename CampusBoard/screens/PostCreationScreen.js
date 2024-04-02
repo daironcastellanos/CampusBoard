@@ -6,6 +6,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Picker } from '@react-native-picker/picker';
 
+
 const PostCreationScreen = () => {
   const [postContent, setPostContent] = useState('');
   const [selectedTag, setSelectedTag] = useState('safety');
