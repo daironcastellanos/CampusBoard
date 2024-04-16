@@ -13,9 +13,13 @@ import SearchScreen from './screens/SearchScreen';
 import SignupScreen from './screens/SignupScreen';
 import LoginScreen from './screens/LoginScreen';
 import BottomTabBar from './components/BottomTabBar';
+import { DeletionProvider } from './components/DeletionContext';
+// Ensure this path is correct
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+
 
 function App() {
   const [user, setUser] = useState(null);
@@ -44,9 +48,11 @@ function App() {
   );
 
   return (
-    <NavigationContainer>
-      {user ? <MainApp /> : <AuthStack />}
-    </NavigationContainer>
+    <DeletionProvider>
+      <NavigationContainer>
+        {user ? <MainApp /> : <AuthStack />}
+      </NavigationContainer>
+    </DeletionProvider>
   );
 }
 

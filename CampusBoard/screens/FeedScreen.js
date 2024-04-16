@@ -1,122 +1,144 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, Text, Image } from 'react-native';
+import { View, StyleSheet, FlatList, ActivityIndicator, Text, TouchableOpacity, ScrollView } from 'react-native';
 import Post from '../components/Post';
-import { Picker } from '@react-native-picker/picker';
-import { getFirestore, collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
+import Events from '../components/Events';
+import { getFirestore, collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { auth } from '../firebaseConfig';
 
 const FeedScreen = () => {
-  // State variables
-  const [posts, setPosts] = useState([]);// Stores the list of posts
-  const [selectedTag, setSelectedTag] = useState('all'); // Stores the currently selected tag
-  
-  // Predefined tags for filtering posts
-  const predefinedTags = ['all', 'safety', 'homework', 'party', 'sublease']; // Example tags
+  const [feedItems, setFeedItems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedTag, setSelectedTag] = useState('all');
+  const [error, setError] = useState(null);
+  const predefinedTags = ['all ✅', 'events 🎊', 'safety 🦺', 'homework 📚', 'party 🎉', 'sublease 🏠'];
 
   useEffect(() => {
-    // Function to fetch posts from the Firestore database
-    const fetchFollowingPosts = async () => {
+    const fetchFeedItems = async () => {
+      setIsLoading(true);
       const db = getFirestore();
       const currentUser = auth.currentUser;
 
-      // Check if a user is logged in
       if (!currentUser) {
-        console.log("No user logged in");
+        setError("Authentication error: No user logged in.");
+        setIsLoading(false);
         return;
       }
 
-      // Get the reference to the user's "follows" document
-      const followsDocRef = doc(db, 'follows', currentUser.uid);
-      const followsDocSnap = await getDoc(followsDocRef);
+      try {
+        const usersSnapshot = await getDocs(collection(db, 'users'));
+        const users = usersSnapshot.docs.reduce((acc, doc) => ({
+          ...acc,
+          [doc.id]: { userName: doc.data().name, userProfilePic: doc.data().profileImageUrl || '' }
+        }), {});
 
-      // Check if the "follows" document exists
-      if (!followsDocSnap.exists()) {
-        console.log("Following list not found");
-        return;
+        const postsSnapshot = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc')));
+        const eventsSnapshot = await getDocs(query(collection(db, 'events'), orderBy('createdAt', 'desc')));
+
+        const postsList = postsSnapshot.docs.map(doc => ({
+          type: 'post',
+          ...doc.data(),
+          id: doc.id,
+          userName: users[doc.data().userId]?.userName || 'Unknown User',
+          userProfilePic: users[doc.data().userId]?.userProfilePic,
+        }));
+
+        const eventsList = eventsSnapshot.docs.map(doc => ({
+          type: 'event',
+          ...doc.data(),
+          id: doc.id,
+          userName: users[doc.data().userId]?.userName || 'Unknown User',
+          userProfilePic: users[doc.data().userId]?.userProfilePic,
+          eventDate: doc.data().eventDate.toDate(), // Ensure date is converted from Firestore Timestamp to JavaScript Date object
+        }));
+
+        let combinedList = [...postsList, ...eventsList].sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
+
+        setFeedItems(combinedList);
+      } catch (error) {
+        console.error("Error fetching feed items:", error);
+        setError(`Error fetching data: ${error.message}`);
+      } finally {
+        setIsLoading(false);
       }
-
-       // Extract the list of followed user IDs
-      const followingList = followsDocSnap.data().following || [];
-      let postsList = [];
-  
-      for (const userId of followingList) {
-        // Query posts collection for the current user ID
-        const postsQuery = query(collection(db, 'posts'), where("userId", "==", userId));
-        const querySnapshot = await getDocs(postsQuery);
-        const userDocRef = doc(db, "users", userId); // Reference to the user document
-        const userDocSnap = await getDoc(userDocRef);
-
-        // Check if the user document exists
-        if (!userDocSnap.exists()) {
-          console.log("User not found");
-          continue;
-        }
-
-        // Extract user details
-        const userData = userDocSnap.data(); 
-
-        // Iterate over each post document
-        querySnapshot.forEach((doc) => {
-           // Create a post object with additional user details
-          let post = { id: doc.id, ...doc.data(), userName: userData.name, userProfilePic: userData.profileImageUrl };
-          // Filter posts based on the selected tag
-          if (selectedTag === 'all' || post.tag === selectedTag) {
-            postsList.push(post);
-          }
-        });
-      }
-
-      // Sort posts by createdAt timestamp in descending order
-      postsList.sort((a, b) => b.createdAt.toDate() - a.createdAt.toDate());
-      
-      // Update the state with the fetched posts
-      setPosts(postsList);
     };
-  
-    fetchFollowingPosts();
-  }, [selectedTag]);  // Re-fetch posts when the selected tag changes
 
-  const renderPost = ({ item }) => (
-    <Post
-      userName={item.userName}
-      userProfilePic={item.userProfilePic}
-      postContent={item.content} // Ensure this matches your data structure
-      imageUrl={item.imageUrl}
-      createdAt={item.createdAt}
-      tag={item.tag}
-    
-      />
-    );
+    fetchFeedItems();
+  }, [selectedTag]);
+
+  const renderFeedItem = ({ item }) => {
+    if (item.type === 'post') {
+      return <Post {...item} />;
+    } else if (item.type === 'event') {
+      return <Events {...item} />;
+    }
   };
+
+  if (isLoading) {
+    return <ActivityIndicator size="large" color="#0000ff" />;
+  }
+
+  if (error) {
+    return <View style={styles.centeredContainer}><Text style={styles.errorText}>{error}</Text></View>;
+  }
 
   return (
     <View style={styles.container}>
-      <Picker
-        selectedValue={selectedTag}
-        onValueChange={(itemValue, itemIndex) => setSelectedTag(itemValue)}
-        style={styles.picker}>
-        {predefinedTags.map((tag) => (
-          <Picker.Item key={tag} label={tag} value={tag} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tagContainer}>
+        {predefinedTags.map(tag => (
+          <TouchableOpacity
+            key={tag}
+            style={[styles.tag, selectedTag === tag && styles.tagSelected]}
+            onPress={() => setSelectedTag(tag)}
+          >
+            <Text style={styles.tagText}>{tag}</Text>
+          </TouchableOpacity>
         ))}
-      </Picker>
+      </ScrollView>
       <FlatList
-        data={posts}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderPost}
+        data={feedItems}
+        keyExtractor={item => item.id.toString()}
+        renderItem={renderFeedItem}
       />
     </View>
   );
 };
 
-// Styles for the component
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 10,
   },
-  picker: {
-    width: '100%',
-    marginBottom: 20,
+  tagContainer: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  tag: {
+    backgroundColor: '#ddd',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginRight: 10,
+    width: 100, // Ensuring a fixed width
+    height: 40, // Ensuring a fixed height
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tagSelected: {
+    backgroundColor: '#000',
+  },
+  tagText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center'
+  },
+  centeredContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 18,
   },
 });
 

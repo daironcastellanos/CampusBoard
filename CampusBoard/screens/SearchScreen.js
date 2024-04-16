@@ -50,6 +50,7 @@ const SearchScreen = () => {
         data={results}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        ListHeaderComponent={results.length > 0 ? <Text style={styles.resultsHeader}>Search Results</Text> : null}
       />
     </View>
   );
@@ -58,21 +59,28 @@ const SearchScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f9f9f9',
   },
   searchInput: {
     height: 40,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#ccc',
     padding: 10,
-    borderRadius: 5,
+    borderRadius: 20,
     margin: 10,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
   },
   userContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    borderBottomColor: '#eee',
   },
   profileImage: {
     width: 50,
@@ -83,6 +91,13 @@ const styles = StyleSheet.create({
   userName: {
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  resultsHeader: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    color: '#333',
   },
 });
 
