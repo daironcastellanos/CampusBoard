@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { auth, db } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
 import Post from '../components/Post';
 
 const ProfileScreen = () => {
@@ -16,51 +16,67 @@ const ProfileScreen = () => {
   const isCurrentUserProfile = userId === auth.currentUser?.uid;
 
   useEffect(() => {
-    const fetchProfileData = async () => {
-      const userDocRef = doc(db, 'users', userId);
-      const userDocSnap = await getDoc(userDocRef);
-      if (userDocSnap.exists()) {
-        setUserProfile({
-          id: userId,
-          name: userDocSnap.data().name,
-          profilePicUrl: userDocSnap.data().profileImageUrl || 'https://via.placeholder.com/150',
-        });
-      }
-
-      const postsQuery = query(collection(db, 'posts'), where("userId", "==", userId));
-      const querySnapshot = await getDocs(postsQuery);
-      setPosts(querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })));
-    };
-
     fetchProfileData();
   }, [userId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      checkFollowingStatus();
+    }, [userId])
+  );
+
+  const checkFollowingStatus = async () => {
+    const followsDocRef = doc(db, 'follows', auth.currentUser.uid);
+    const followsDocSnap = await getDoc(followsDocRef);
+    if (followsDocSnap.exists()) {
+      const following = followsDocSnap.data().following || [];
+      setIsFollowing(following.includes(userId));
+    } else {
+      setIsFollowing(false);
+    }
+  };
+
+  const fetchProfileData = async () => {
+    const userDocRef = doc(db, 'users', userId);
+    const userDocSnap = await getDoc(userDocRef);
+    if (userDocSnap.exists()) {
+      setUserProfile({
+        id: userId,
+        name: userDocSnap.data().name,
+        profilePicUrl: userDocSnap.data().profileImageUrl || 'https://via.placeholder.com/150',
+      });
+    }
+
+    const postsQuery = query(collection(db, 'posts'), where("userId", "==", userId));
+    const querySnapshot = await getDocs(postsQuery);
+    setPosts(querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      userProfilePic: userDocSnap.data().profileImageUrl || 'https://via.placeholder.com/150'  // Include profile picture URL in each post
+    })));
+  };
 
   const handleFollowToggle = async () => {
     const followsDocRef = doc(db, 'follows', auth.currentUser.uid);
     const followsDocSnap = await getDoc(followsDocRef);
 
-    if (followsDocSnap.exists()) {
-      const following = followsDocSnap.data().following || [];
-      if (following.includes(userId)) {
-        await updateDoc(followsDocRef, {
-          following: arrayRemove(userId)
-        });
-        setIsFollowing(false);
-      } else {
+    const isCurrentlyFollowing = isFollowing;
+    setIsFollowing(!isCurrentlyFollowing);
+
+    if (isCurrentlyFollowing) {
+      await updateDoc(followsDocRef, {
+        following: arrayRemove(userId)
+      });
+    } else {
+      if (followsDocSnap.exists()) {
         await updateDoc(followsDocRef, {
           following: arrayUnion(userId)
         });
-        setIsFollowing(true);
+      } else {
+        await setDoc(followsDocRef, {
+          following: [userId]
+        });
       }
-    } else {
-      // If follows document does not exist, create it and add the user
-      await setDoc(followsDocRef, {
-        following: [userId]
-      });
-      setIsFollowing(true);
     }
   };
 
