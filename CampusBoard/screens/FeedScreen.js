@@ -1,22 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, Text, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, StyleSheet, FlatList, ActivityIndicator, Text, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import Post from '../components/Post';
 import Events from '../components/Events';
-import { getFirestore, collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore'; // Ensure these imports are correct
+import { getFirestore, collection, getDocs, query, orderBy, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { auth } from '../firebaseConfig';
 
 const FeedScreen = () => {
   const [feedItems, setFeedItems] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedTag, setSelectedTag] = useState('all');
   const [error, setError] = useState(null);
   const predefinedTags = ['all ✅', 'events 🎊', 'safety 🦺', 'homework 📚', 'party 🎉', 'sublease 🏠'];
 
-  useEffect(() => {
-    fetchFeedItems();
-  }, [selectedTag]);
-
-  const fetchFeedItems = async () => {
+  const fetchFeedItems = useCallback(async () => {
     setIsLoading(true);
     const db = getFirestore();
     const currentUser = auth.currentUser;
@@ -30,61 +27,52 @@ const FeedScreen = () => {
     try {
       const postsSnapshot = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc')));
       const eventsSnapshot = await getDocs(query(collection(db, 'events'), orderBy('createdAt', 'desc')));
-      const userIDs = new Set([...postsSnapshot.docs, ...eventsSnapshot.docs].map(doc => doc.data().userId));
-      const userPromises = Array.from(userIDs).map(userId => getDoc(doc(db, 'users', userId)));
-      const userDocs = await Promise.all(userPromises);
-      const users = userDocs.reduce((acc, doc) => {
-        if (doc.exists()) {
-          acc[doc.id] = { userName: doc.data().name, userProfilePic: doc.data().profileImageUrl || '' };
-        }
-        return acc;
-      }, {});
+      const users = {};
+
+      // Deduplicate user fetching
+      const userIds = new Set([...postsSnapshot.docs, ...eventsSnapshot.docs].map(doc => doc.data().userId));
+      await Promise.all(Array.from(userIds).map(userId => 
+        getDoc(doc(db, 'users', userId)).then(userDoc => {
+          users[userId] = userDoc.exists() ? {
+            userName: userDoc.data().name,
+            userProfilePic: userDoc.data().profileImageUrl || ''
+          } : { userName: 'Unknown User', userProfilePic: '' };
+        })
+      ));
 
       const postsList = postsSnapshot.docs.map(doc => ({
         type: 'post',
         ...doc.data(),
         id: doc.id,
-        userName: users[doc.data().userId]?.userName || 'Unknown User',
-        userProfilePic: users[doc.data().userId]?.userProfilePic,
+        ...users[doc.data().userId]
       }));
 
       const eventsList = eventsSnapshot.docs.map(doc => ({
         type: 'event',
         ...doc.data(),
         id: doc.id,
-        userName: users[doc.data().userId]?.userName || 'Unknown User',
-        userProfilePic: users[doc.data().userId]?.userProfilePic,
+        ...users[doc.data().userId],
+        eventDate: doc.data().eventDate ? new Date(doc.data().eventDate.seconds * 1000) : 'Invalid Date'
       }));
 
-      let combinedList = [...postsList, ...eventsList];
-      if (selectedTag !== 'all') {
-        combinedList = combinedList.filter(item => (item.tag === selectedTag) || (selectedTag === 'events 🎊' && item.type === 'event'));
-      }
-
-      setFeedItems(combinedList);
+      setFeedItems([...postsList, ...eventsList].filter(item => selectedTag === 'all' || item.tag === selectedTag || (selectedTag === 'events 🎊' && item.type === 'event')).sort((a, b) => b.createdAt.seconds - a.createdAt.seconds));
     } catch (error) {
       console.error("Error fetching feed items:", error);
       setError(`Error fetching data: ${error.message}`);
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
+  }, [selectedTag]); // dependency on selectedTag
+
+  useEffect(() => {
+    fetchFeedItems();
+  }, [fetchFeedItems]);
+
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    fetchFeedItems();
   };
-
-  const renderFeedItem = ({ item }) => {
-    if (item.type === 'post') {
-      return <Post {...item} />;
-    } else if (item.type === 'event') {
-      return <Events {...item} />;
-    }
-  };
-
-  if (isLoading) {
-    return <ActivityIndicator size="large" color="#0000ff" />;
-  }
-
-  if (error) {
-    return <View style={styles.centeredContainer}><Text style={styles.errorText}>{error}</Text></View>;
-  }
 
   return (
     <View style={styles.container}>
@@ -102,7 +90,8 @@ const FeedScreen = () => {
       <FlatList
         data={feedItems}
         keyExtractor={item => item.id.toString()}
-        renderItem={renderFeedItem}
+        renderItem={({ item }) => item.type === 'post' ? <Post {...item} /> : <Events {...item} />}
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
       />
     </View>
   );
@@ -123,8 +112,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 20,
     marginRight: 10,
-    width: 100, // Ensuring a fixed width
-    height: 40, // Ensuring a fixed height
+    width: 100,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -134,7 +123,7 @@ const styles = StyleSheet.create({
   tagText: {
     color: '#fff',
     fontSize: 16,
-    textAlign: 'center'
+    textAlign: 'center',
   },
   centeredContainer: {
     flex: 1,
