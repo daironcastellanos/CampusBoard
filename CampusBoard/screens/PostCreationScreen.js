@@ -58,41 +58,62 @@ const PostCreationScreen = () => {
     if (image) {
       const response = await fetch(image);
       const blob = await response.blob();
-      const storagePath = `events/${auth.currentUser.uid}/${Date.now()}`;
+      const storagePath = (isEvent ? `events` : `posts`) + `/${auth.currentUser.uid}/${Date.now()}`;
       const imageRef = ref(storage, storagePath);
       await uploadBytes(imageRef, blob);
       imageUrl = await getDownloadURL(imageRef);
     }
-
-    // Ensure all fields are filled
-    if (isEvent && (!eventName.trim() || !eventDescription.trim() || !eventLocation.trim())) {
-      Alert.alert('Error', 'All event fields must be filled.');
-      return;
+  
+    const timestamp = Timestamp.now(); // Firebase timestamp for the creation time
+  
+    if (isEvent) {
+      if (!eventName.trim() || !eventDescription.trim() || !eventLocation.trim()) {
+        Alert.alert('Error', 'All event fields must be filled.');
+        return;
+      }
+  
+      const eventData = {
+        type: 'event', // Explicitly setting type to 'event'
+        eventName: eventName.trim(),
+        eventDescription: eventDescription.trim(),
+        eventLocation: eventLocation.trim(),
+        eventDate: Timestamp.fromDate(eventDate),
+        imageUrl,
+        tag: 'events 🎊', // Automatically setting the tag to 'events'
+        userId: auth.currentUser.uid,
+        createdAt: timestamp,
+      };
+  
+      try {
+        await addDoc(collection(db, 'events'), eventData);
+        Alert.alert('Success', 'Event created successfully!');
+      } catch (error) {
+        console.error("Error creating event: ", error);
+        Alert.alert('Error', 'Could not create the event. Please try again later.');
+      }
+    } else {
+      const postData = {
+        type: 'post', // Explicitly setting type to 'post'
+        content: postContent.trim(),
+        tag: selectedTag,
+        imageUrl,
+        userId: auth.currentUser.uid,
+        createdAt: timestamp,
+      };
+  
+      try {
+        await addDoc(collection(db, 'posts'), postData);
+        Alert.alert('Success', 'Post created successfully!');
+      } catch (error) {
+        console.error("Error creating post: ", error);
+        Alert.alert('Error', 'Could not create the post. Please try again later.');
+      }
     }
-
-    // Convert the date to a Firebase timestamp
-    const eventTimestamp = Timestamp.fromDate(eventDate);
-
-    const eventData = {
-      eventName: eventName.trim(),
-      eventDescription: eventDescription.trim(),
-      eventLocation: eventLocation.trim(),
-      eventDate: eventTimestamp,
-      imageUrl, // Will be empty string if no image was uploaded
-      userId: auth.currentUser.uid,
-      createdAt: Timestamp.now(), // Current time as Firebase timestamp
-    };
-
-    try {
-      await addDoc(collection(db, 'events'), eventData);
-      Alert.alert('Success', 'Event created successfully!');
-      resetForm();
-    } catch (error) {
-      console.error("Error creating event: ", error);
-      Alert.alert('Error', 'Could not create the event. Please try again later.');
-    }
+  
+    resetForm(); // Reset form fields after submission regardless of success
   };
-
+  
+  
   const resetForm = () => {
     setPostContent('');
     setSelectedTag(predefinedTags[0]);

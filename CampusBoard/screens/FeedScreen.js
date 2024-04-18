@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, FlatList, ActivityIndicator, Text, TouchableOpacity, ScrollView } from 'react-native';
 import Post from '../components/Post';
 import Events from '../components/Events';
-import { getFirestore, collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore'; // Ensure these imports are correct
 import { auth } from '../firebaseConfig';
 
 const FeedScreen = () => {
@@ -13,57 +13,62 @@ const FeedScreen = () => {
   const predefinedTags = ['all ✅', 'events 🎊', 'safety 🦺', 'homework 📚', 'party 🎉', 'sublease 🏠'];
 
   useEffect(() => {
-    const fetchFeedItems = async () => {
-      setIsLoading(true);
-      const db = getFirestore();
-      const currentUser = auth.currentUser;
-
-      if (!currentUser) {
-        setError("Authentication error: No user logged in.");
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        const usersSnapshot = await getDocs(collection(db, 'users'));
-        const users = usersSnapshot.docs.reduce((acc, doc) => ({
-          ...acc,
-          [doc.id]: { userName: doc.data().name, userProfilePic: doc.data().profileImageUrl || '' }
-        }), {});
-
-        const postsSnapshot = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc')));
-        const eventsSnapshot = await getDocs(query(collection(db, 'events'), orderBy('createdAt', 'desc')));
-
-        const postsList = postsSnapshot.docs.map(doc => ({
-          type: 'post',
-          ...doc.data(),
-          id: doc.id,
-          userName: users[doc.data().userId]?.userName || 'Unknown User',
-          userProfilePic: users[doc.data().userId]?.userProfilePic,
-        }));
-
-        const eventsList = eventsSnapshot.docs.map(doc => ({
-          type: 'event',
-          ...doc.data(),
-          id: doc.id,
-          userName: users[doc.data().userId]?.userName || 'Unknown User',
-          userProfilePic: users[doc.data().userId]?.userProfilePic,
-          eventDate: doc.data().eventDate.toDate(), // Ensure date is converted from Firestore Timestamp to JavaScript Date object
-        }));
-
-        let combinedList = [...postsList, ...eventsList].sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
-
-        setFeedItems(combinedList);
-      } catch (error) {
-        console.error("Error fetching feed items:", error);
-        setError(`Error fetching data: ${error.message}`);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchFeedItems();
   }, [selectedTag]);
+
+  const fetchFeedItems = async () => {
+    setIsLoading(true);
+    const db = getFirestore();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      setError("Authentication error: No user logged in.");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const postsSnapshot = await getDocs(query(collection(db, 'posts'), orderBy('createdAt', 'desc')));
+      const eventsSnapshot = await getDocs(query(collection(db, 'events'), orderBy('createdAt', 'desc')));
+      const userIDs = new Set([...postsSnapshot.docs, ...eventsSnapshot.docs].map(doc => doc.data().userId));
+      const userPromises = Array.from(userIDs).map(userId => getDoc(doc(db, 'users', userId)));
+      const userDocs = await Promise.all(userPromises);
+      const users = userDocs.reduce((acc, doc) => {
+        if (doc.exists()) {
+          acc[doc.id] = { userName: doc.data().name, userProfilePic: doc.data().profileImageUrl || '' };
+        }
+        return acc;
+      }, {});
+
+      const postsList = postsSnapshot.docs.map(doc => ({
+        type: 'post',
+        ...doc.data(),
+        id: doc.id,
+        userName: users[doc.data().userId]?.userName || 'Unknown User',
+        userProfilePic: users[doc.data().userId]?.userProfilePic,
+      }));
+
+      const eventsList = eventsSnapshot.docs.map(doc => ({
+        type: 'event',
+        ...doc.data(),
+        id: doc.id,
+        userName: users[doc.data().userId]?.userName || 'Unknown User',
+        userProfilePic: users[doc.data().userId]?.userProfilePic,
+      }));
+
+      let combinedList = [...postsList, ...eventsList];
+      if (selectedTag !== 'all') {
+        combinedList = combinedList.filter(item => (item.tag === selectedTag) || (selectedTag === 'events 🎊' && item.type === 'event'));
+      }
+
+      setFeedItems(combinedList);
+    } catch (error) {
+      console.error("Error fetching feed items:", error);
+      setError(`Error fetching data: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const renderFeedItem = ({ item }) => {
     if (item.type === 'post') {

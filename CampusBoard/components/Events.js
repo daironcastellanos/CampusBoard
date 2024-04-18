@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useDeletion } from '../components/DeletionContext'; // Ensure this is the correct import path
 
 const Events = ({ id, eventName, eventDescription, eventLocation, eventDate, imageUrl }) => {
-  // Function to handle bell icon press
+  const { deletePostOrEvent } = useDeletion();
+
   const handleBellPress = () => {
     Alert.alert(
       "Notification Set",
@@ -12,20 +14,29 @@ const Events = ({ id, eventName, eventDescription, eventLocation, eventDate, ima
     );
   };
 
-  // Format the event date for display
-  const displayDate = eventDate ? new Date(eventDate).toLocaleDateString("en-US", {
-    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
-  }) : "Date not available";
+  const handleDelete = () => {
+    Alert.alert(
+      "Delete Event",
+      "Are you sure you want to delete this event?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", onPress: () => deletePostOrEvent(id, 'event') }
+      ]
+    );
+  };
 
-  // Handle opening event location in Google Maps
   const openLocation = () => {
     const encodedLocation = encodeURIComponent(eventLocation);
     const url = `https://www.google.com/maps/search/?api=1&query=${encodedLocation}`;
-    Linking.openURL(url).catch(err => console.error('An error occurred', err));
+    Linking.openURL(url).catch(err => console.error('An error occurred opening the map:', err));
   };
 
+  const displayDate = eventDate ? `${new Date(eventDate).toLocaleDateString("en-US", {
+    year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  })}` : "Date not available";
+
   return (
-    <TouchableOpacity onLongPress={() => alert('Long press detected')} style={styles.container}>
+    <TouchableOpacity onLongPress={handleDelete} style={styles.container}>
       <TouchableOpacity onPress={handleBellPress} style={styles.bellButton}>
         <MaterialIcons name="notifications" size={24} color="black" />
       </TouchableOpacity>
